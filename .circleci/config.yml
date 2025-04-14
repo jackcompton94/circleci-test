@@ -1,0 +1,34 @@
+version: 2.1
+
+jobs:
+  test_timeout_mechanism:
+    docker:
+      - image: cimg/base:2024.01
+    steps:
+      # Timeout Watchdog (will fail job after 1 minute)
+      - run:
+          name: "⏰ TIMEOUT WATCHDOG (1m)"
+          background: true
+          command: |
+            echo "Timeout monitor started (will fail job in 60 seconds if still running)"
+            sleep 60
+            echo "❌ Job timed out after 1 minute!"
+            exit 1
+
+      # Long-running task (will be interrupted)
+      - run:
+          name: "Long-running task (2m sleep)"
+          command: |
+            echo "This task would normally take 2 minutes..."
+            sleep 120
+            echo "This message should never appear!"
+
+      # This step should never execute
+      - run:
+          name: "Success step"
+          command: echo "✅ Job completed successfully"
+
+workflows:
+  test_timeout:
+    jobs:
+      - test_timeout_mechanism
