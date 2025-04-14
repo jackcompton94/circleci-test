@@ -20,7 +20,7 @@ jobs:
           name: "Long-running task (2m sleep)"
           command: |
             echo "This task would normally take 2 minutes..."
-            sleep 120
+            sleep 10
             echo "This message should never appear!"
 
       # This step should never execute
