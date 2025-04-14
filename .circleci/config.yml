@@ -1,38 +1,45 @@
 version: 2.1
 
+commands:
+  # Define the timeout wrapper (add this once)
+  with_job_timeout:
+    description: "Kills entire job after timeout"
+    parameters:
+      timeout_minutes:
+        type: integer
+      steps:
+        type: steps
+    steps:
+      - run:
+          name: "⏰ Timeout Monitor (<< parameters.timeout_minutes >>m)"
+          background: true
+          command: |
+            sleep $(( << parameters.timeout_minutes >> * 60 ))
+            echo "ERROR: Job timed out after << parameters.timeout_minutes >> minutes!"
+            pkill -SIGKILL -f "circleci" || true
+            exit 1
+      - steps: << parameters.steps >>
+
 jobs:
-  test_forceful_timeout:
+  # Test job with 1-minute timeout (easy to verify)
+  test_timeout:
     docker:
       - image: cimg/base:2024.01
     steps:
-      # Timeout Watchdog (30s)
-      - run:
-          name: "⏰ Timeout Monitor (30s)"
-          background: true
-          command: |
-            sleep 30
-            echo "❌ Job timed out after 30 seconds!" > /tmp/timeout_flag
-            exit 1
-
-      # Main task (checks for timeout)
-      - run:
-          name: "Long-running task (60s)"
-          command: |
-            for i in {1..60}; do
-              if [ -f /tmp/timeout_flag ]; then
-                echo "Timeout detected! Killing job..."
-                exit 1
-              fi
-              sleep 1
-              echo "Working... $i/60"
-            done
-
-      # Cleanup (only runs if no timeout)
-      - run:
-          name: "Success"
-          command: echo "✅ Completed successfully"
+      - with_job_timeout:
+          timeout_minutes: 1  # Will fail after 60 seconds
+          steps:
+            - run:
+                name: "Long task (2m sleep)"
+                command: |
+                  echo "This task would run for 2 minutes if not killed..."
+                  sleep 120
+                  echo "THIS WILL NEVER PRINT"
+            - run:
+                name: "Success step"
+                command: echo "❌ You shouldn't see this message"
 
 workflows:
   test:
     jobs:
-      - test_forceful_timeout
+      - test_timeout
