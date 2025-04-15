@@ -2,17 +2,19 @@ version: 2.1
 
 workflows:
   test_concurrency:
-    concurrency:
-      group: test-concurrency-demo
-      cancel-in-progress: true
     triggers:
       - schedule:
-          cron: "*/1 * * * *"  # Every minute
+          cron: "*/1 * * * *"  # Every 1 minute
           filters:
             branches:
               only: main
     jobs:
       - simulate_lengthy_process
+
+    # ✅ concurrency must go INSIDE the named workflow, not at the top level
+    concurrency:
+      group: test-concurrency-demo
+      cancel-in-progress: true
 
 jobs:
   simulate_lengthy_process:
@@ -25,7 +27,7 @@ jobs:
       - run:
           name: Sleep for 90s
           command: |
-            echo "Sleeping..."
+            echo "Sleeping for 90s..."
             sleep 90
       - run:
           name: Done
