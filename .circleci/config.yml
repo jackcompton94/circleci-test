@@ -1,58 +1,33 @@
 version: 2.1
 
-commands:
-  with_job_timeout:
-    description: "Kills job after timeout"
-    parameters:
-      timeout_minutes:
-        type: integer
-      steps:
-        type: steps
-    steps:
-      - run:
-          name: "⏰ Timeout Monitor (<< parameters.timeout_minutes >>m)"
-          background: true
-          command: |
-            sleep $(( << parameters.timeout_minutes >> * 60 ))
-            echo "ERROR: Job timed out after << parameters.timeout_minutes >> minutes!"
-            pkill -SIGKILL -f "circleci" || true
-            exit 1
-      - steps: << parameters.steps >>
+workflows:
+  test_concurrency:
+    concurrency:
+      group: test-concurrency-demo
+      cancel-in-progress: true
+    triggers:
+      - schedule:
+          cron: "*/1 * * * *"  # Every minute
+          filters:
+            branches:
+              only: main
+    jobs:
+      - simulate_lengthy_process
 
 jobs:
-  # First job (will timeout and fail)
-  job_that_times_out:
+  simulate_lengthy_process:
     docker:
-      - image: cimg/base:2024.01
-    steps:
-      - with_job_timeout:
-          timeout_minutes: 1  # Fails after 1 minute
-          steps:
-            - run:
-                name: "Task that takes 2 minutes"
-                command: |
-                  echo "Starting long task..."
-                  sleep 120  # Will be killed after 1m
-                  echo "THIS LINE NEVER RUNS"
-            - run:
-                name: "Cleanup (unreachable)"
-                command: echo "❌ Should not appear"
-
-  # Second job (depends on first, won't run)
-  dependent_job:
-    docker:
-      - image: cimg/base:2024.01
+      - image: cimg/base:stable
     steps:
       - run:
-          name: "Only runs if first job succeeds"
+          name: Start
+          command: echo "Job started at $(date)"
+      - run:
+          name: Sleep for 90s
           command: |
-            echo "✅ Dependency succeeded!"
-            echo "This message proves the timeout failed"
+            echo "Sleeping..."
+            sleep 90
+      - run:
+          name: Done
+          command: echo "Job finished at $(date)"
 
-workflows:
-  test_chain_timeout:
-    jobs:
-      - job_that_times_out
-      - dependent_job:
-          requires:
-            - job_that_times_out  # Only runs if first job passes
