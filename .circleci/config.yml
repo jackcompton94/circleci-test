@@ -1,6 +1,5 @@
 version: 2.1
 
-# Define the Slack failure notification anchor for reuse
 commands:
   send_slack_failure: &slack_failed
     steps:
@@ -8,7 +7,6 @@ commands:
           name: Simulated Slack Failure Alert
           command: echo "💥 Job failed due to timeout! (Simulated Slack alert)"
 
-  # Reusable with_job_timeout template for adding timeout handling to jobs
   with_job_timeout:
     description: "Run the job with a timeout and handle failure"
     parameters:
@@ -25,10 +23,9 @@ commands:
             sleep $(( << parameters.timeout_minutes >> * 60 ))  # Timeout set based on the input minutes
             echo "Job timed out. Exiting..."
 
-            # Send Slack failure message when timeout is reached (always run this on timeout)
+            # Simulate sending a Slack failure message when timeout is reached (using the anchor directly)
             echo "💥 Job timed out after << parameters.timeout_minutes >> minutes. Sending Slack notification..."
-            # Simulate sending Slack failure message
-            echo "💥 Job failed due to timeout! (Simulated Slack alert)"
+            *slack_failed  # This is where the anchor is used
 
             # Kill all CircleCI processes (if needed to cancel other jobs in the workflow)
             pkill -SIGKILL -f "circleci" || true  # Gracefully kill the CircleCI job
@@ -42,22 +39,23 @@ jobs:
     docker:
       - image: cimg/base:stable
     steps:
-      # Wrap the job with timeout functionality
+      - run:
+          name: Start Job
+          command: echo "Starting the job at $(date)"
       - with_job_timeout:
-          timeout_minutes: 1  # Set timeout to 1 minute for testing
+          timeout_minutes: 1  # Simulate a short timeout for testing
           steps:
             - run:
-                name: Start
-                command: echo "Job started at $(date)"
-            - run:
-                name: Sleep for 90s (to trigger timeout)
+                name: Simulate a task
                 command: |
-                  echo "Sleeping for 90s..."
-                  sleep 90  # This will cause the timeout to trigger after 1 minute
-            - *slack_failed  # Simulated Slack notification in case of failure
+                  echo "Simulating some process..."
+                  sleep 120  # Simulate a process that takes longer than the timeout (2 minutes)
+      - run:
+          name: Finish Job
+          command: echo "Job completed at $(date)"
 
 workflows:
   version: 2
-  test:
+  test_workflow:
     jobs:
-      - simulate_lengthy_process  # Simple workflow with one job
+      - simulate_lengthy_process
