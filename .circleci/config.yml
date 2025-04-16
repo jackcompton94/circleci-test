@@ -1,33 +1,54 @@
 version: 2.1
 
+# Define the Slack failure notification anchor for reuse
+commands:
+  send_slack_failure: &slack_failed
+    steps:
+      - run:
+          name: Simulated Slack Failure Alert
+          command: echo "💥 Job failed! (Simulated Slack alert)"
+
+  # Reusable with_job_timeout template for adding timeout handling to jobs
+  with_job_timeout:
+    description: "Run the job with a timeout and handle failure"
+    parameters:
+      timeout_minutes:
+        type: integer
+      steps:
+        type: steps
+    steps:
+      - run:
+          name: "Timeout Monitor (<< parameters.timeout_minutes >>m)"
+          background: true
+          command: |
+            # Start the timeout countdown
+            sleep $(( << parameters.timeout_minutes >> * 60 ))  # Timeout set based on the input minutes
+            echo "Job timed out. Exiting..."
+            exit 1  # Simulate a timeout failure
+
+      - steps: << parameters.steps >>  # Execute the steps passed to this command
+
 jobs:
   simulate_lengthy_process:
     docker:
       - image: cimg/base:stable
     steps:
-      - run:
-          name: Start
-          command: echo "Job started at $(date)"
-      - run:
-          name: Sleep for 90s
-          command: |
-            echo "Sleeping for 90s..."
-            sleep 90
-      - run:
-          name: Done
-          command: echo "Job finished at $(date)"
+      # Wrap the job with timeout functionality
+      - with_job_timeout:
+          timeout_minutes: 1  # Set timeout to 1 minute for testing
+          steps:
+            - run:
+                name: Start
+                command: echo "Job started at $(date)"
+            - run:
+                name: Sleep for 90s (to trigger timeout)
+                command: |
+                  echo "Sleeping for 90s..."
+                  sleep 90  # This will cause the timeout to trigger after 1 minute
+            - *slack_failed  # Simulated Slack notification in case of failure
 
 workflows:
-  test_concurrency:
-    triggers:
-      - schedule:
-          cron: "* * * * *"  # Every minute (✔️ POSIX compliant)
-          filters:
-            branches:
-              only: main
-    concurrency:
-      group: test-concurrency-demo
-      cancel-in-progress: true
+  version: 2
+  test:
     jobs:
-      - simulate_lengthy_process
-
+      - simulate_lengthy_process  # Simple workflow with one job
