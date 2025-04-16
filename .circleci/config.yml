@@ -1,21 +1,5 @@
 version: 2.1
 
-workflows:
-  test_concurrency:
-    triggers:
-      - schedule:
-          cron: "*/1 * * * *"  # Every 1 minute
-          filters:
-            branches:
-              only: main
-    jobs:
-      - simulate_lengthy_process
-
-    # ✅ concurrency must go INSIDE the named workflow, not at the top level
-    concurrency:
-      group: test-concurrency-demo
-      cancel-in-progress: true
-
 jobs:
   simulate_lengthy_process:
     docker:
@@ -32,4 +16,18 @@ jobs:
       - run:
           name: Done
           command: echo "Job finished at $(date)"
+
+workflows:
+  test_concurrency:
+    triggers:
+      - schedule:
+          cron: "* * * * *"  # Every minute (✔️ POSIX compliant)
+          filters:
+            branches:
+              only: main
+    concurrency:
+      group: test-concurrency-demo
+      cancel-in-progress: true
+    jobs:
+      - simulate_lengthy_process
 
