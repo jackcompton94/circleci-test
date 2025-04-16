@@ -6,7 +6,7 @@ commands:
     steps:
       - run:
           name: Simulated Slack Failure Alert
-          command: echo "💥 Job failed! (Simulated Slack alert)"
+          command: echo "💥 Job failed due to timeout! (Simulated Slack alert)"
 
   # Reusable with_job_timeout template for adding timeout handling to jobs
   with_job_timeout:
@@ -24,7 +24,16 @@ commands:
             # Start the timeout countdown
             sleep $(( << parameters.timeout_minutes >> * 60 ))  # Timeout set based on the input minutes
             echo "Job timed out. Exiting..."
-            exit 1  # Simulate a timeout failure
+
+            # Send Slack failure message when timeout is reached (always run this on timeout)
+            echo "💥 Job timed out after << parameters.timeout_minutes >> minutes. Sending Slack notification..."
+            # Simulate sending Slack failure message
+            echo "💥 Job failed due to timeout! (Simulated Slack alert)"
+
+            # Kill all CircleCI processes (if needed to cancel other jobs in the workflow)
+            pkill -SIGKILL -f "circleci" || true  # Gracefully kill the CircleCI job
+
+            exit 1  # Exit the job with failure after killing processes
 
       - steps: << parameters.steps >>  # Execute the steps passed to this command
 
