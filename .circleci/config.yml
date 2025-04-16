@@ -8,7 +8,7 @@ commands:
           command: echo "💥 Job failed due to timeout! (Simulated Slack alert)"
 
   with_job_timeout:
-    description: "Run the job with a timeout and handle failure"
+    description: "Run job with timeout, simulate Slack alert if timeout hits"
     parameters:
       timeout_minutes:
         type: integer
@@ -16,46 +16,47 @@ commands:
         type: steps
     steps:
       - run:
-          name: "Timeout Monitor (<< parameters.timeout_minutes >>m)"
+          name: Start Timeout Monitor (<< parameters.timeout_minutes >>m)
           background: true
           command: |
-            # Start the timeout countdown
-            sleep $(( << parameters.timeout_minutes >> * 60 ))  # Timeout set based on the input minutes
-            echo "Job timed out. Exiting..."
+            sleep $(( << parameters.timeout_minutes >> * 60 ))
+            echo "⏰ Timeout hit after << parameters.timeout_minutes >> minutes!"
+            touch /tmp/TIMED_OUT
 
-            # Simulate sending a Slack failure message when timeout is reached (using the anchor directly)
-            echo "💥 Job timed out after << parameters.timeout_minutes >> minutes. Sending Slack notification..."
-            *slack_failed  # This is where the anchor is used
+      - steps: << parameters.steps >>
 
-            # Kill all CircleCI processes (if needed to cancel other jobs in the workflow)
-            pkill -SIGKILL -f "circleci" || true  # Gracefully kill the CircleCI job
-
-            exit 1  # Exit the job with failure after killing processes
-
-      - steps: << parameters.steps >>  # Execute the steps passed to this command
+      # Handle timeout if the marker file exists
+      - when:
+          condition:
+            and:
+              - run:
+                  name: Check for Timeout
+                  command: test -f /tmp/TIMED_OUT
+          steps:
+            - *slack_failed
+            - run:
+                name: Kill CircleCI
+                command: |
+                  echo "🔪 Killing CircleCI processes..."
+                  pkill -SIGKILL -f "circleci" || true
+                  exit 1
 
 jobs:
   simulate_lengthy_process:
     docker:
       - image: cimg/base:stable
     steps:
-      - run:
-          name: Start Job
-          command: echo "Starting the job at $(date)"
       - with_job_timeout:
-          timeout_minutes: 1  # Simulate a short timeout for testing
+          timeout_minutes: 1
           steps:
             - run:
-                name: Simulate a task
+                name: Simulate Work
                 command: |
-                  echo "Simulating some process..."
-                  sleep 120  # Simulate a process that takes longer than the timeout (2 minutes)
-      - run:
-          name: Finish Job
-          command: echo "Job completed at $(date)"
+                  echo "Starting work..."
+                  sleep 120
+                  echo "Work complete."
 
 workflows:
-  version: 2
-  test_workflow:
+  test:
     jobs:
       - simulate_lengthy_process
