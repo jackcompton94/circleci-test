@@ -1,7 +1,7 @@
 version: 2.1
 
 commands:
-  send_slack_failure: &slack_failed
+  send_slack_failure:
     steps:
       - run:
           name: Simulated Slack Failure Alert
@@ -16,30 +16,20 @@ commands:
         type: steps
     steps:
       - run:
-          name: Start Timeout Monitor (<< parameters.timeout_minutes >>m)
+          name: "Timeout Countdown (<< parameters.timeout_minutes >>m)"
           background: true
           command: |
-            sleep $(( << parameters.timeout_minutes >> * 60 ))
+            sleep $(( << parameters.timeout_minutes >> * 60 ))  # Set timeout based on input minutes
             echo "⏰ Timeout hit after << parameters.timeout_minutes >> minutes!"
-            touch /tmp/TIMED_OUT
+            # Simulate sending a Slack failure message when timeout is reached
+            echo "💥 Job timed out after << parameters.timeout_minutes >> minutes. Sending Slack notification..."
+            # Trigger the Slack failure message
+            circleci step run send_slack_failure
+            # Kill all CircleCI processes (terminate job and workflow)
+            pkill -SIGKILL -f "circleci" || true
+            exit 1  # Exit the job with failure after sending Slack message and killing processes
 
       - steps: << parameters.steps >>
-
-      # Handle timeout if the marker file exists
-      - when:
-          condition:
-            and:
-              - run:
-                  name: Check for Timeout
-                  command: test -f /tmp/TIMED_OUT
-          steps:
-            - *slack_failed
-            - run:
-                name: Kill CircleCI
-                command: |
-                  echo "🔪 Killing CircleCI processes..."
-                  pkill -SIGKILL -f "circleci" || true
-                  exit 1
 
 jobs:
   simulate_lengthy_process:
@@ -47,13 +37,13 @@ jobs:
       - image: cimg/base:stable
     steps:
       - with_job_timeout:
-          timeout_minutes: 1
+          timeout_minutes: 1  # Set to a 1-minute timeout for testing
           steps:
             - run:
                 name: Simulate Work
                 command: |
                   echo "Starting work..."
-                  sleep 120
+                  sleep 120  # Simulate work that exceeds the timeout
                   echo "Work complete."
 
 workflows:
