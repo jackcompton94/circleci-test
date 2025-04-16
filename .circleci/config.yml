@@ -24,7 +24,7 @@ commands:
             # Simulate sending a Slack failure message when timeout is reached
             echo "💥 Job timed out after << parameters.timeout_minutes >> minutes. Sending Slack notification..."
             # Trigger the Slack failure message
-            circleci step run send_slack_failure
+            *send_slack_failure
             # Kill all CircleCI processes (terminate job and workflow)
             pkill -SIGKILL -f "circleci" || true
             exit 1  # Exit the job with failure after sending Slack message and killing processes
